@@ -1,10 +1,74 @@
 /**
- * Returns customerSuccess that are not away
- * @param {array} customerSuccess
- * @param {array} customerSuccessAway
+ * Filters customersSuccess that are not away
+ * @param {array} customersSuccess
+ * @param {array} customersSuccessAway
+ * @returns {array} Filtered customersSuccess
  */
-function filterAvailableCustomersSuccess(customerSuccess, customerSuccessAway) {
-  return customerSuccess.filter(cs => !customerSuccessAway.includes(cs.id));
+function filterAvailableCustomersSuccess(customersSuccess, customersSuccessAway) {
+  return customersSuccess.filter(css => !customersSuccessAway.includes(css.id));
+}
+
+/**
+ * Finds the closest CustomerSuccess for a given customer
+ * @param {object} customer
+ * @param {array} availableCustomersSuccess
+ * @returns {number} Id of the closest CustomerSuccess
+ */
+function findClosestCustomerSuccessId(customer, availableCustomersSuccess) {
+  let closestCustomerSuccessId = 0;
+  let minDiff = Infinity;
+
+  availableCustomersSuccess.forEach((css) => {
+    const diff = css.score - customer.score;
+
+    if (diff >= 0 && diff < minDiff) {
+      minDiff = diff;
+      closestCustomerSuccessId = css.id;
+    }
+  });
+
+  return closestCustomerSuccessId;
+}
+
+/**
+ * Updates the customerCount for a given CustomerSuccess
+ * @param {number} closestCustomerSuccessId
+ * @param {array} availableCustomersSuccess
+ */
+function updateCustomerCount(closestCustomerSuccessId, availableCustomersSuccess) {
+  const availableCustomerSuccessIndex = availableCustomersSuccess.findIndex(css => css.id === closestCustomerSuccessId);
+
+  if (availableCustomerSuccessIndex !== -1) {
+    if (!availableCustomersSuccess[availableCustomerSuccessIndex].customerCount) {
+      availableCustomersSuccess[availableCustomerSuccessIndex].customerCount = 1;
+    } else {
+      availableCustomersSuccess[availableCustomerSuccessIndex].customerCount += 1;
+    }
+  }
+
+  return availableCustomersSuccess;
+}
+
+/**
+ * Finds the CustomerSuccess with the maximum customerCount
+ * @param {array} availableCustomersSuccess
+ * @returns {number} Id of the CustomerSuccess with the maximum customerCount
+ */
+function findMaxCustomerCountId(availableCustomersSuccess) {
+  let maxCustomerCount = -Infinity;
+  let customerSuccessId = 0;
+
+  for (const css of availableCustomersSuccess) {
+    if (css?.customerCount && css.customerCount > maxCustomerCount) {
+      maxCustomerCount = css.customerCount;
+      customerSuccessId = css.id;
+    } else if (css?.customerCount && css.customerCount === maxCustomerCount) {
+      customerSuccessId = 0;
+      break;
+    }
+  }
+
+  return customerSuccessId;
 }
 
 /**
@@ -18,48 +82,21 @@ function customerSuccessBalancing(
   customers,
   customersSuccessAway
 ) {
-  const availableCustomersSuccess = filterAvailableCustomersSuccess(
+  let availableCustomersSuccess = filterAvailableCustomersSuccess(
     customersSuccess,
     customersSuccessAway
   );
 
   customers.forEach((customer) => {
-    let closestCustomerSuccessId = 0;
-    let minDiff = Infinity;
+    const closestCustomerSuccessId = findClosestCustomerSuccessId(
+      customer,
+      availableCustomersSuccess
+    );
 
-    availableCustomersSuccess.forEach((cs) => {
-      const diff = cs.score - customer.score;
-
-      if (diff >= 0 && diff < minDiff) {
-        minDiff = diff;
-        closestCustomerSuccessId = cs.id;
-      }
-    })
-
-    availableCustomersSuccess.forEach((cs) => {
-      if (cs.id === closestCustomerSuccessId) {
-        if (!cs.customerCount) {
-          cs.customerCount = 1;
-        } else {
-          cs.customerCount += 1;
-        }
-      }
-    })
+    availableCustomersSuccess = updateCustomerCount(closestCustomerSuccessId, availableCustomersSuccess);
   })
 
-  let maxCustomerCount = 0;
-  let customerSuccessId = 0;
-
-  availableCustomersSuccess.forEach((cs) => {
-    if (cs?.customerCount && cs.customerCount > maxCustomerCount) {
-      maxCustomerCount = cs.customerCount;
-      customerSuccessId = cs.id;
-    } else if (cs?.customerCount && cs.customerCount === maxCustomerCount) {
-      customerSuccessId = 0;
-    }
-  })
-
-  return customerSuccessId;
+  return findMaxCustomerCountId(availableCustomersSuccess);
 }
 
 test("Scenario 1", () => {
@@ -162,3 +199,39 @@ test("Scenario 8", () => {
   const csAway = [2, 4];
   expect(customerSuccessBalancing(css, customers, csAway)).toEqual(1);
 });
+
+test("Scenario 9", () => {
+  const css = [{ id: 1, score: 60 }];
+  const customers = [
+    { id: 1, score: 90 },
+    { id: 2, score: 70 },
+    { id: 3, score: 20 },
+    { id: 4, score: 40 },
+    { id: 5, score: 60 },
+    { id: 6, score: 10 },
+  ];
+  const csAway = [];
+
+  expect(customerSuccessBalancing(css, customers, csAway)).toEqual(1);
+});
+
+test("Scenario 10", () => {
+  const css = [
+    { id: 1, score: 60 },
+    { id: 2, score: 40 },
+    { id: 3, score: 95 },
+    { id: 4, score: 75 },
+    { id: 5, score: 80 },
+  ];
+  const customers = [
+    { id: 1, score: 90 },
+    { id: 2, score: 70 },
+    { id: 3, score: 20 },
+    { id: 4, score: 40 },
+    { id: 5, score: 60 },
+    { id: 6, score: 10 },
+  ];
+  const csAway = [1, 3, 5];
+
+  expect(customerSuccessBalancing(css, customers, csAway)).toEqual(2);
+})
